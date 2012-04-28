@@ -9,14 +9,14 @@ object Analyzer {
   def main(args: Array[String]) {
     val praktijkidRegex = """PR(\d+)""".r
     val foutcodeRegex = """FOUTCODE: (\d+)(-)(\d+)(-)(\d+)_(\d+)(.)+(_)(\d+)""".r
-    val filesDir = "/home/gordon/Development/logging/files"
+    val logfilesDir = "/home/gordon/Development/logging/files"
 
     //  val lines = Source.fromFile(args(0)).getLines.buffered // returns a bufferedIterator so you can look ahead without advancing the iterator using the head()
     //  val lines = Source.fromFile(args(0)).getLines.toArray                   //read file and put lines in an array
 
     // Reading files from dir
     def readFiles : Array[String] =  {
-      val files = new java.io.File(filesDir).listFiles.filter(_.getName.endsWith(".log"))
+      val files = new java.io.File(logfilesDir).listFiles.filter(_.getName.endsWith(".log"))
       var tempList = new ListBuffer[String]
       files.foreach(file => tempList = tempList ++ Source.fromFile(file).getLines.toList)
       tempList.toArray                                               // Assign all the lines of the logfiles to an array
@@ -53,13 +53,13 @@ object Analyzer {
     val mongoConn = MongoConnection()
     val mongoCollection = mongoConn("log_analyzer")("feedbacks")
 
-    var lineNumber = 0
 
-//    if (args.length > 0) {
+    //    if (args.length > 0) {
     def lineContainsPraktijkId(line: String): Boolean = {
       getPrakijkId(praktijkidRegex findFirstIn line).isEmpty
     }
 
+    var lineNumber = 0
 
     for (line <- lines) {
         // to prevent index out of bounds exception
@@ -89,46 +89,12 @@ object Analyzer {
         lineNumber += 1
       }
       
-      val result = mongoCollection.find()
+//      val result = mongoCollection.find()
 
       val feedbackList = errors.toList                                    // contains stacktrace
       val feedbackListWithoutStacktrace = errorsWithoutStacktrace.toList
 
-      val fileWriter = new FileWriter(filesDir + "/output.txt");
-
-      //prints only unique elements of the sorted list
-      feedbackList.distinct.sortWith((pair1, pair2) => pair1._1 < pair2._1 ).foreach(pair => {
-        println(pair._1)       // Foutcode line
-        println(pair._2)       // stacktrace
-        println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
-        
-        fileWriter.write(pair._1 + "\n")
-        fileWriter.write(pair._2 + "\n")
-        fileWriter.write("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
-        }
-      )
-
-      feedbackListWithoutStacktrace.distinct.sortWith(_ < _).foreach(println)
-      feedbackListWithoutStacktrace.distinct.sortWith(_ < _).foreach(line => fileWriter.write(line + "\n"))
-
-
-      println("Number of unique feedbacks: " + feedbackList.distinct.length)
-      println("number of lines: " + lineNumber)
-      println("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------")
-      println("Number of exceptions (feedback has praktijkId): " + exceptions.length)
-
-      fileWriter.write("Number of unique feedbacks: " + feedbackList.distinct.length + "\n")
-      fileWriter.write("number of lines: " + lineNumber + "\n")
-      fileWriter.write("--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n")
-      fileWriter.write("Number of exceptions (feedback has praktijkId): " + exceptions.length + "\n")
-
-      
-      exceptions.groupBy(x => x).mapValues(_.length).toSeq.sortWith(_._2 > _._2).foreach(println)                  //counts the occurences of exceptions found in the stacktrace of feedbacks
-      exceptions.groupBy(x => x).mapValues(_.length).toSeq.sortWith(_._2 > _._2).foreach(line => fileWriter.write(line + "\n"))
-      
-      println("Feedbacks are written to the file: output.txt (inside logfiles dir)")
-
-      fileWriter.close()
+      Writer.writeToFile(lineNumber, feedbackList, feedbackListWithoutStacktrace, exceptions)
 
 //    } else Console.err.println("please provide a directory containing the logfile(s)!")
 
